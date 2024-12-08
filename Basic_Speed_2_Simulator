@@ -1,0 +1,175 @@
+import random
+import math
+
+# Constants
+GRID_SIZE = 4       # Define grid size (n x n)
+NUM_COPS = 2        # Number of cops
+TIME_LIMIT = 10000  # Maximum number of rounds
+
+class Position:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def __eq__(self, other):
+        return self.x == other.x and self.y == other.y
+
+    def is_valid(self):
+        return 0 <= self.x < GRID_SIZE and 0 <= self.y < GRID_SIZE
+
+    def is_central(self):
+        return 1 <= self.x < GRID_SIZE-1 and 1 <= self.y < GRID_SIZE-1
+
+    def is_corner(self):
+        return (self.x == 0 or self.x == GRID_SIZE-1) and (0 == self.y or self.y == GRID_SIZE-1)
+
+    def move(self, dx, dy):
+        new_x = self.x + dx
+        new_y = self.y + dy
+        if 0 <= new_x < GRID_SIZE and 0 <= new_y < GRID_SIZE:
+            self.x = new_x
+            self.y = new_y
+
+def calculate_distance(pos1, pos2):
+    """Calculate the Manhattan distance between two positions."""
+    return abs(pos1.x - pos2.x) + abs(pos1.y - pos2.y)
+
+def find_best_initial_position(cops):
+    """Find the position that maximizes the minimum distance to all cops."""
+    max_min_goodness = -2*GRID_SIZE
+    best_position = None
+    
+    for x in range(GRID_SIZE):
+        for y in range(GRID_SIZE):
+            current_position = Position(x, y)
+            min_distance = min(calculate_distance(current_position, cop) for cop in cops)
+
+            # If a position is too close to a cop, it receives minimal goodness score.
+            min_goodness=-2*GRID_SIZE
+
+            # Otherwise, calculate goodness index for position.
+            if min_distance>1:
+                min_goodness=2*GRID_SIZE*(current_position.is_central()-current_position.is_corner())+min_distance
+
+            # Update the best position if this move is better
+            if min_goodness > max_min_goodness:
+                max_min_goodness = min_goodness
+                best_position = current_position
+
+    return best_position
+
+def initialize_positions(num_cops):
+    """Initialize cops and robber with optimal strategy for the robber."""
+    cops = [Position(random.randint(0, GRID_SIZE - 1), random.randint(0, GRID_SIZE - 1)) for _ in range(num_cops)]
+    robber = find_best_initial_position(cops)
+    return cops, robber
+
+
+def print_grid(cops, robber):
+    grid = [['.' for _ in range(GRID_SIZE)] for _ in range(GRID_SIZE)]
+
+    for cop in cops:
+        grid[cop.x][cop.y] = 'C'
+
+    grid[robber.x][robber.y] = 'R'
+
+    for row in grid:
+        print(' '.join(row))
+    print()
+
+def move_cops(cops,robber):
+    for cop in cops:
+        # If next to robber catch them!
+        if calculate_distance(cop,robber)==1:
+            dx=robber.x-cop.x
+            dy=robber.y-cop.y
+        # Otherwise move randomly
+        else:
+            possible_moves = [
+            (0, 0),  # Stay in place
+            (1, 0), (-1, 0),  # Horizontal moves
+            (0, 1), (0, -1),  # Vertical moves
+            ]
+            dx,dy = random.choice(possible_moves)
+        cop.move(dx, dy)
+
+def best_move_for_robber(robber, cops):
+    max_min_goodness = -2*GRID_SIZE
+    best_position = robber  # Default to current position if no better move is found
+
+    # All possible moves for the robber (robber moves at most two steps)
+    possible_moves = [
+        (0, 0),  # Stay in place
+        (1, 0), (-1, 0),(2,0),(-2,0),  # Horizontal moves
+        (0, 1), (0, -1),(0,2),(0,-2),  # Vertical moves
+        (1,1),(1,-1),(-1,1),(-1,-1)    # Diagonal moves
+    ]
+
+    for dx, dy in possible_moves:
+        new_position = Position(robber.x + dx, robber.y + dy)
+
+        # Ensure the move is valid
+        if new_position.is_valid():
+            # If a position is too close to a cop, it receives minimal goodness score.
+            min_goodness=-2*GRID_SIZE
+            min_distance=min(calculate_distance(new_position, cop) for cop in cops)
+            # Otherwise, calculate goodness index for position.
+            if min_distance>1:
+                min_goodness=2*GRID_SIZE*(new_position.is_central()-new_position.is_corner())+min_distance
+
+            # Update the best position if this move is better
+            if min_goodness > max_min_goodness:
+                max_min_goodness = min_goodness
+                best_position = new_position
+
+    return best_position
+
+def move_robber(robber, cops):
+    robber_position = best_move_for_robber(robber, cops)
+    robber.x = robber_position.x
+    robber.y = robber_position.y
+
+
+def is_capture(cops, robber):
+    return any(cop == robber for cop in cops)
+
+def main():
+    # Initialize positions
+    cops, robber = initialize_positions(NUM_COPS)
+    round_num = 0
+    # Display intial positions
+    print(f"Round {round_num}:")
+    print_grid(cops, robber)
+
+    while round_num<TIME_LIMIT:
+        round_num += 1
+
+        # Move cops
+        move_cops(cops,robber)
+
+        # Check for capture
+        if is_capture(cops, robber):
+            print("Cops win! Robber captured during cops' turn.")
+            break
+
+        # Move robber
+        move_robber(robber,cops)
+        if robber.is_corner():
+            print(f"Round {round_num}:")
+            print_grid(cops, robber)
+
+        # Check for capture after each move
+        if is_capture(cops, robber):
+            print("Cops win! Robber captured during robber's turn.")
+            break
+        # Display positions at end of round
+#        print(f"Round {round_num}:")
+#        print_grid(cops, robber)
+        
+    print("Time Limit Reached.")
+    
+    # Display final positions
+    print(f"Round {round_num}:")
+    print_grid(cops, robber)
+
+main()
